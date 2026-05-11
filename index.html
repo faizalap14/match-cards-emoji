@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mismatch-cards</title>
+
+<style>
+body {
+  background: radial-gradient(circle at top, #161b22, #0d1117);
+  color: white;
+  text-align: center;
+  font-family: Arial;
+  margin: 0;
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+h2 { margin-top: 15px; color: #58a6ff; }
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.control-box {
+  background: #161b22;
+  padding: 15px 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 15px #000;
+}
+
+.control-box label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #8b949e;
+}
+
+input {
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+  width: 90px;
+  text-align: center;
+}
+
+.start-btn {
+  background: linear-gradient(45deg, #58a6ff, #1f6feb);
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+}
+
+#timer {
+  margin-top: 15px;
+  font-size: 20px;
+  color: #58a6ff;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 12px;
+  margin-top: 25px;
+  padding: 10px;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.card {
+  width: 60px;
+  height: 80px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: 0.5s;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(88,166,255,0.4);
+}
+
+.card.flip { transform: rotateY(180deg); }
+.card.hide { visibility: hidden; }
+
+.face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  backface-visibility: hidden;
+}
+
+.front {
+  background: #21262d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.back {
+  background: linear-gradient(145deg, #58a6ff, #1f6feb);
+  transform: rotateY(180deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* GAME OVER */
+.game-over {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+
+.popup {
+  background: #161b22;
+  padding: 25px;
+  border-radius: 12px;
+}
+
+/* FOOTER (Faizal Design) */
+.footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  color: #8b949e;
+  background: rgba(13,17,23,0.95);
+  border-top: 1px solid #30363d;
+}
+
+.footer span {
+  color: #58a6ff;
+  font-weight: bold;
+  text-shadow: 0 0 8px #58a6ff;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🎮 Mismatch Cards</h2>
+
+<div class="controls">
+
+  <div class="control-box">
+    <label>⏱ Time (seconds)</label>
+    <input type="number" id="timeInput" min="5" max="300" value="20">
+  </div>
+
+  <div class="control-box">
+    <label>🧩 Pairs</label>
+    <input type="number" id="pairInput" min="2" max="30" value="10">
+  </div>
+
+  <button class="start-btn" onclick="startGame()">🚀 Start Game</button>
+</div>
+
+<h3 id="timer">Time: 0</h3>
+<div id="board" class="board"></div>
+
+<div id="gameOver" class="game-over">
+  <div class="popup">
+    <h2 id="resultText"></h2>
+    <button onclick="startGame()">🔄 Play Again</button>
+  </div>
+</div>
+
+<!-- ✅ FOOTER -->
+<div class="footer">
+  Designed with ❤️ by <span>Faizal</span>
+</div>
+
+<script>
+const board = document.getElementById("board");
+const timerText = document.getElementById("timer");
+
+let first = null, second = null, lock = false;
+let timeLeft = 0, timerInterval;
+let matched = 0, totalPairs = 0;
+
+const foods = [
+  "😋","🍇","🍈","🍉","🍊","🍌","🍍","🥭","🍎","🍑",
+  "🍒","🍓","🫐","🥝","🍅","🫒","🥑","🍆","🥔","🥕",
+  "🥒","🥜","🫘","🍄‍","🟫","🍞","🥐","🫓","🥖","🥞",
+  "🍖","🫔","🍕","🍟","🍔","🥓","🍗","🥙","🥚","🥘",
+  "🍲","🫕","🥗","🍛","🍚","🍙","🍘","🍱","🥫","🍜",
+  "🍝","🍠","🍢","🍣","🍤","🍪","🍩","🍨","🍦","🦑",
+  "🦐","🍰","🍭","🍯","🫖","🧋"
+];
+
+function startGame() {
+  clearInterval(timerInterval);
+  document.getElementById("gameOver").style.display = "none";
+
+  first = null;
+  second = null;
+  lock = false;
+
+  let time = parseInt(document.getElementById("timeInput").value);
+  let pairs = parseInt(document.getElementById("pairInput").value);
+
+  if (isNaN(time) || time < 5) time = 5;
+  if (time > 300) time = 300;
+
+  if (isNaN(pairs) || pairs < 2) pairs = 2;
+  if (pairs > foods.length) pairs = foods.length;
+
+  timeLeft = time;
+  matched = 0;
+  totalPairs = pairs;
+
+  timerText.textContent = "Time: " + timeLeft;
+
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerText.textContent = "Time: " + timeLeft;
+
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      endGame(false);
+    }
+  }, 1000);
+
+  createBoard(pairs);
+}
+
+function createBoard(pairCount) {
+  board.innerHTML = "";
+
+  let selected = foods.slice(0, pairCount);
+  let cards = [...selected, ...selected];
+  shuffle(cards);
+
+  cards.forEach(val => {
+    let card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="face front">?</div>
+      <div class="face back">${val}</div>
+    `;
+
+    card.onclick = () => flip(card, val);
+    board.appendChild(card);
+  });
+}
+
+function flip(card, val) {
+  if (lock || card.classList.contains("flip") || timeLeft <= 0) return;
+  if (first && first.card === card) return;
+
+  card.classList.add("flip");
+
+  if (!first) {
+    first = { card, val };
+    return;
+  }
+
+  second = { card, val };
+  lock = true;
+
+  if (first.val === second.val) {
+    matched++;
+    setTimeout(() => {
+      first.card.classList.add("hide");
+      second.card.classList.add("hide");
+      reset();
+
+      if (matched === totalPairs) {
+        clearInterval(timerInterval);
+        endGame(true);
+      }
+    }, 300);
+  } else {
+    setTimeout(() => {
+      first.card.classList.remove("flip");
+      second.card.classList.remove("flip");
+      reset();
+    }, 600);
+  }
+}
+
+function reset() {
+  first = null;
+  second = null;
+  lock = false;
+}
+
+function endGame(win) {
+  const box = document.getElementById("gameOver");
+  const text = document.getElementById("resultText");
+
+  text.textContent = win
+    ? `🏆 You Win! (${matched}/${totalPairs})`
+    : `⏰ Game Over (${matched}/${totalPairs})`;
+
+  box.style.display = "flex";
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    let j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+</script>
+<!-- code by faizal & with use chatgpt -->
+</body>
+</html>
